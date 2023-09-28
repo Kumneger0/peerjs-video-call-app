@@ -1,6 +1,6 @@
 import React, {
-  Dispatch,
-  SetStateAction,
+
+  useContext,
   useEffect,
   useImperativeHandle,
   useRef,
@@ -10,12 +10,11 @@ import { Peer } from "peerjs";
 import { handleUserStateEvent } from "../utils/utils";
 import { peerAtom } from "../state/state";
 import { useAtom } from "jotai";
+import { UserContext } from "../App";
 
 const peer1 = new Peer("some string");
 
 const connctedPeers: string[] = [];
-
-const user = prompt("enter username please");
 
 declare global {
   interface Window {
@@ -45,7 +44,8 @@ const connect = (
   updateLocalUserId: (id: string) => void,
   updateRemoteStream: (stream: MediaStream, userId: string) => void,
   handleUserDisconnect: (uid: string) => void,
-  SetAtom: (peer: Peer) => void
+  SetAtom: (peer: Peer) => void,
+  user: string
 ) => {
   peer = new Peer(user!, {
     host: "localhost",
@@ -108,7 +108,6 @@ const connect = (
 function connectToRemote(
   remoteId: string,
   updateRemoteStream: (stream: MediaStream, userId: string) => void,
-  setIsJoined: Dispatch<SetStateAction<boolean>>,
   localUserId: string,
   handleUserDisconnect: (uid: string) => void
 ) {
@@ -119,7 +118,6 @@ function connectToRemote(
       id: remoteId,
       onDisconnct: handleUserDisconnect,
     });
-    setIsJoined(true);
     conn?.on("open", () => {
       conn.on("data", (data) => {
         const message = data as MessageType;
@@ -181,7 +179,7 @@ function connectToRemote(
 
 function Stream() {
   const [, setPeer] = useAtom(peerAtom);
-
+  const { user } = useContext(UserContext);
   const [localStream, setLocalStream] = useState<MediaStream>();
   const [localUserId, setLocalUserId] = useState("");
 
@@ -189,8 +187,7 @@ function Stream() {
     { userId: string; stream: MediaStream }[]
   >([]);
 
-  const [joined, setIsJoined] = useState(false);
-  const inputRef = useRef<{getInputValue : () => string | undefined}>(null);
+  const inputRef = useRef<{ getInputValue: () => string | undefined }>(null);
 
   const handleUserDisconnect = (uid: string) =>
     setRemoteStreams((prv) => prv.filter(({ userId }) => userId !== uid));
@@ -212,12 +209,13 @@ function Stream() {
   };
 
   useEffect(() => {
-    if (!localUserId) {
+    if (!localUserId && user) {
       connect(
         updateLocalUserId,
         updateRemoteStream,
         handleUserDisconnect,
-        setPeer
+        setPeer,
+        user
       );
     }
     if (localUserId) {
@@ -247,24 +245,27 @@ function Stream() {
     e.preventDefault();
     console.log("form handled");
     console.log(inputRef);
-    const value = inputRef.current?.getInputValue()
+    const value = inputRef.current?.getInputValue();
     if (!value) return;
 
     connectToRemote(
       value,
       updateRemoteStream,
-      setIsJoined,
       localUserId,
       handleUserDisconnect
     );
   }
 
-  // console.log(localStream)
-
+  if (!user) {
+    return (
+      <div className="flex justify-center items-center">
+        <div>failed to get your information</div>
+      </div>
+    );
+  }
   return (
     <>
       <div>your id is {localUserId ? localUserId : null}</div>
-      {joined ? (
         <div>
           <div>
             {localStream ? (
@@ -286,9 +287,7 @@ function Stream() {
             })}
           </div>
         </div>
-      ) : (
         <Form ref={inputRef} handleFormSubmit={handleFormSubmit} />
-      )}
     </>
   );
 }
@@ -316,11 +315,14 @@ const Video = ({ stream }: { stream: MediaStream }) => {
 export default Stream;
 
 const Form = React.forwardRef(
-  ({
-    handleFormSubmit,
-  }: {
-    handleFormSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
-  }, ref ) => {
+  (
+    {
+      handleFormSubmit,
+    }: {
+      handleFormSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+    },
+    ref
+  ) => {
     const inputRef = useRef<HTMLInputElement>(null);
 
     useImperativeHandle(
