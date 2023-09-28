@@ -1,0 +1,11 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+*{
+    @apply text-white
+}
+
+body{
+  @apply overflow-x-hidden bg-gray-800
+}
