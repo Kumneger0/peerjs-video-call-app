@@ -1,8 +1,10 @@
-import React from "react";
+import React, { useState } from "react";
 import Stream from "./components/Stream";
 import Header from "./components/Header";
 
 function App() {
+  const [user, setUser] = useState<string | null>(null);
+
   return (
     <>
       <Header />

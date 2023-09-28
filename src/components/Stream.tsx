@@ -1,4 +1,11 @@
-import { useEffect, useRef, useState } from "react";
+import React, {
+  Dispatch,
+  SetStateAction,
+  useEffect,
+  useImperativeHandle,
+  useRef,
+  useState,
+} from "react";
 import { Peer } from "peerjs";
 import { handleUserStateEvent } from "../utils/utils";
 import { peerAtom } from "../state/state";
@@ -101,12 +108,13 @@ const connect = (
 function connectToRemote(
   remoteId: string,
   updateRemoteStream: (stream: MediaStream, userId: string) => void,
-  setIsJoined: (joinded: boolean) => void,
+  setIsJoined: Dispatch<SetStateAction<boolean>>,
   localUserId: string,
   handleUserDisconnect: (uid: string) => void
 ) {
   if (peer) {
     const conn = peer.connect(remoteId);
+    console.log("data connections ", conn);
     handleUserStateEvent(conn, {
       id: remoteId,
       onDisconnct: handleUserDisconnect,
@@ -182,7 +190,7 @@ function Stream() {
   >([]);
 
   const [joined, setIsJoined] = useState(false);
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<{getInputValue : () => string | undefined}>(null);
 
   const handleUserDisconnect = (uid: string) =>
     setRemoteStreams((prv) => prv.filter(({ userId }) => userId !== uid));
@@ -238,8 +246,10 @@ function Stream() {
   function handleFormSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     console.log("form handled");
-    const value = inputRef.current?.value;
+    console.log(inputRef);
+    const value = inputRef.current?.getInputValue()
     if (!value) return;
+
     connectToRemote(
       value,
       updateRemoteStream,
@@ -254,51 +264,31 @@ function Stream() {
   return (
     <>
       <div>your id is {localUserId ? localUserId : null}</div>
-      <div>
-        {localStream ? (
-          <>
-            <Video stream={localStream} />
-            <div>you</div>
-          </>
-        ) : null}
-      </div>
+      {joined ? (
+        <div>
+          <div>
+            {localStream ? (
+              <>
+                <Video stream={localStream} />
+                <div>you</div>
+              </>
+            ) : null}
+          </div>
 
-      <div className="flex justify-center items-center flex-wrap gap-4">
-        {remoteStreams?.map((v) => {
-          return (
-            <div className="min-w-[300px] shadow-lg rounded-md bg-slate-600">
-              <Video stream={v.stream} />
-              <div>{v.userId}</div>
-            </div>
-          );
-        })}
-      </div>
-      <div className="flex justify-center items-center h-screen w-screen flex-col">
-        {!joined ? (
-          <>
-            {" "}
-            <form
-              className="flex justify-center flex-col"
-              onSubmit={handleFormSubmit}>
-              <div>
-                <input
-                  ref={inputRef}
-                  className="border border-black p-2 rounded-md text-black"
-                  type="text"
-                />
-              </div>
-              <div className="flex justify-center items-center mx-2">
-                <button className="bg-green-600 rounded-md p-2 m-2 text-white">
-                  join live
-                </button>
-                <button className="bg-green-600 rounded-md p-2 m-2 text-white">
-                  create
-                </button>
-              </div>
-            </form>{" "}
-          </>
-        ) : null}
-      </div>
+          <div className="flex justify-center items-center flex-wrap gap-4">
+            {remoteStreams?.map((v) => {
+              return (
+                <div className="min-w-[300px] shadow-lg rounded-md bg-slate-600">
+                  <Video stream={v.stream} />
+                  <div>{v.userId}</div>
+                </div>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+        <Form ref={inputRef} handleFormSubmit={handleFormSubmit} />
+      )}
     </>
   );
 }
@@ -324,3 +314,52 @@ const Video = ({ stream }: { stream: MediaStream }) => {
 };
 
 export default Stream;
+
+const Form = React.forwardRef(
+  ({
+    handleFormSubmit,
+  }: {
+    handleFormSubmit: (e: React.FormEvent<HTMLFormElement>) => void;
+  }, ref ) => {
+    const inputRef = useRef<HTMLInputElement>(null);
+
+    useImperativeHandle(
+      ref,
+      () => {
+        return {
+          getInputValue: () => {
+            return inputRef.current?.value;
+          },
+        };
+      },
+      []
+    );
+
+    return (
+      <div className="flex justify-center items-center h-screen w-screen flex-col">
+        <>
+          {" "}
+          <form
+            className="flex justify-center flex-col"
+            onSubmit={handleFormSubmit}>
+            <div>
+              <input
+                ref={inputRef}
+                className="border border-black p-2 rounded-md text-black"
+                type="text"
+              />
+            </div>
+            <div className="flex justify-center items-center mx-2">
+              <button className="bg-green-600 rounded-md p-2 m-2 text-white">
+                join live
+              </button>
+              <button className="bg-green-600 rounded-md p-2 m-2 text-white">
+                create
+              </button>
+            </div>
+          </form>
+        </>
+      </div>
+    );
+  }
+);
